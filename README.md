@@ -1,6 +1,8 @@
 # Infinite Plex Library (BETA!)
 
-![image](https://i.imgur.com/vKRC57h.gif)
+Demo video: https://imgur.com/a/xADw6ut
+![image](https://github.com/user-attachments/assets/a6919ef5-7348-4c9d-984e-a4e548f2d1f4)
+
 
 ## Overview
 
