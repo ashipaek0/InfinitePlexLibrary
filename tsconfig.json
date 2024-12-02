@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "moduleResolution": "node", // Zorg dat TypeScript modules kan vinden zoals Node.js dat doet
+    "esModuleInterop": true,    // Maakt ESModule-imports eenvoudiger
+    "allowSyntheticDefaultImports": true, // Laat gebruik van default imports toe
+    "strict": true,              // Optioneel, voor strikte TypeScript controle
+    "target": "ES2020",          // Voor moderne JavaScript
+    "module": "CommonJS"         // Of "ESNext" als je ESModules gebruikt
+  }
+}
