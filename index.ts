@@ -15,7 +15,7 @@ dotenv.config();
 
 app.use(express.json());
 
-// Functie om elke 5 seconden de filmstatus te controleren
+// Function to check movie status every 5 seconds
 async function monitorAvailability(movieId: number, ratingKey: string, originalFilePath: string, movieDescription: string) {
     console.log("🔵 Monitoring availability for the next 5 minutes...");
 
@@ -26,7 +26,7 @@ async function monitorAvailability(movieId: number, ratingKey: string, originalF
         const interval = setInterval(async () => {
             attempts++;
 
-            var requestStatus = `Checking availability for movie (attempt ${attempts}/${maxRetries})...`
+            let requestStatus = `Checking availability for movie (attempt ${attempts}/${maxRetries})...`;
 
             console.log(`🟡 Checking availability (attempt ${attempts}/${maxRetries})...`);
 
@@ -36,20 +36,20 @@ async function monitorAvailability(movieId: number, ratingKey: string, originalF
 
             if (downloading) {
                 console.log(`⏳ Movie ID ${movieId} is currently downloading. Waiting for completion...`);
-                requestStatus = `Movie is currently downloading. Waiting for completion...`
+                requestStatus = `Movie is currently downloading. Waiting for completion...`;
             }
 
-            //  await checkFailedSearches(movieId); // Controleer op mislukte zoekpogingen TEST
+            // await checkFailedSearches(movieId); // Check for failed searches TEST
 
             if (movie) {
-                // Controleer of het bestand een dummy is
+                // Check if the file is a dummy
                 if (movie.movieFile && movie.movieFile.relativePath === "dummy.mp4") {
                     console.log("❌ Dummy file detected, ignoring availability and continuing search.");
-                    //await searchMovieInRadarr(movieId); // Forceer een zoekopdracht
+                    //await searchMovieInRadarr(movieId); // Force a search
                 } else if (movie.hasFile) {
                     console.log(`🎉 Movie "${movie.title}" is now available!`);
 
-                    // Beëindig de stream voor het bestand
+                    // Terminate the stream for the file
                     if (originalFilePath) {
                         await terminateStreamByFile(originalFilePath);
                     }
@@ -64,29 +64,27 @@ async function monitorAvailability(movieId: number, ratingKey: string, originalF
             if (attempts >= maxRetries) {
                 console.log("⏰ Time limit exceeded. The movie is not available yet.");
 
-                // Uitzoeken of er wel een torrent gedownload is; of de film wel beschikbaar is? Dit weten we mogelijk ook al eerder.
+                // Determine if a torrent has been downloaded; is the movie actually available? We might know this sooner.
 
                 clearInterval(interval);
                 resolve();
             }
-        }, 5000); // Controleer elke 10 seconden
+        }, 5000); // Check every 5 seconds
     });
 }
 
-const activeRequests = new Set<string>(); // Houd actieve filmverzoeken bij
+const activeRequests = new Set<string>(); // Track active movie requests
 
-// Route voor de Tautulli webhook
+// Route for the Tautulli webhook
 app.post("/webhook", async (req: Request, res: Response, next: express.NextFunction): Promise<void> => {
-
-
     try {
         const event = req.body;
 
-        console.log("📩 Event ontvangen:", event);
+        console.log("📩 Event received:", event);
 
-        // Controleer of het een playback.start event is
+        // Check if it is a playback.start event
         if (event && event.event === "playback.start") {
-            console.log("▶️ Playback gestart!");
+            console.log("▶️ Playback started!");
             console.log("📋 Event details:", JSON.stringify(event, null, 2));
 
             if (event.media_type === "movie") {
@@ -94,24 +92,24 @@ app.post("/webhook", async (req: Request, res: Response, next: express.NextFunct
                 const ratingKey = event.rating_key;
 
                 if (!ratingKey) {
-                    console.log("⚠️ Geen ratingKey ontvangen in het verzoek.");
+                    console.log("⚠️ No ratingKey received in the request.");
                     res.status(400).send("Invalid request: missing ratingKey.");
                 }
 
-                // Controleer of er al een verzoek loopt voor deze ratingKey
+                // Check if there is already a request for this ratingKey
                 if (activeRequests.has(ratingKey)) {
-                    console.log(`🔁 Verzoek voor film met ratingKey ${ratingKey} is al actief.`);
+                    console.log(`🔁 Request for movie with ratingKey ${ratingKey} is already active.`);
                     res.status(200).send("Request already in progress.");
                 }
 
-                // Voeg ratingKey toe aan de set
+                // Add ratingKey to the set
                 activeRequests.add(ratingKey);
 
                 try {
                     if (imdbId) {
-                        console.log(`🎬 IMDb ID ontvangen: ${imdbId}`);
+                        console.log(`🎬 IMDb ID received: ${imdbId}`);
 
-                        // Vraag de filmgegevens op bij Radarr
+                        // Retrieve movie details from Radarr
                         const response = await axios.get(`${config.RADARR_URL}/movie`, {
                             headers: { "X-Api-Key": config.RADARR_API_KEY },
                         });
@@ -119,154 +117,142 @@ app.post("/webhook", async (req: Request, res: Response, next: express.NextFunct
                         const movie = response.data.find((m: any) => m.imdbId === imdbId);
 
                         if (movie) {
-                            console.log("✅ Film gevonden in Radarr:");
+                            console.log("✅ Movie found in Radarr:");
                             console.log(JSON.stringify(movie, null, 2));
 
                             const originalFilePath = event.file;
 
-                            // Controleer beschikbaarheid
+                            // Check availability
                             if (!movie.hasFile || (movie.movieFile && movie.movieFile.relativePath === "dummy.mp4")) {
                                 console.log("❌ Dummy file detected or movie not available. Initiating search...");
                                 const movieDescription = movie.overview;
 
-                                var requestStatus = "The movie is being requested. Please wait a few moments while it becomes available.";
+                                let requestStatus = "The movie is being requested. Please wait a few moments while it becomes available.";
                                 updatePlexDescription(ratingKey, movieDescription, requestStatus);
 
                                 searchMovieInRadarr(movie.id, config.RADARR_URL, config.RADARR_API_KEY);
 
-                                // Start monitoring voor beschikbaarheid
+                                // Start monitoring for availability
                                 await monitorAvailability(movie.id, ratingKey, originalFilePath, movieDescription);
                             } else {
                                 console.log(`🎉 Movie "${movie.title}" is already available!`);
                             }
                         } else {
-                            console.log("❌ Film niet gevonden in Radarr.");
+                            console.log("❌ Movie not found in Radarr.");
                         }
                     } else {
-                        console.log("⚠️ Geen IMDb ID ontvangen in het verzoek.");
+                        console.log("⚠️ No IMDb ID received in the request.");
                     }
                 } catch (error: any) {
-                    console.error(`❌ Fout bij het verwerken van het verzoek: ${error.message}`);
+                    console.error(`❌ Error processing the request: ${error.message}`);
                 } finally {
-                    // Verwijder ratingKey uit de set na voltooiing
+                    // Remove ratingKey from the set after completion
                     activeRequests.delete(ratingKey);
-                    console.log(`✅ Verzoek voor film met ratingKey ${ratingKey} voltooid.`);
+                    console.log(`✅ Request for movie with ratingKey ${ratingKey} completed.`);
                 }
             } else if (event.media_type === "episode") {
-                console.log("📺 Afspeelactie voor een aflevering gedetecteerd.");
+                console.log("📺 Playback action detected for an episode.");
             }
         } else {
-            console.log("⚠️ Ontvangen event is geen playback.start:", event.event);
+            console.log("⚠️ Received event is not playback.start:", event.event);
         }
 
-        res.status(200).send("Webhook ontvangen.");
-
+        res.status(200).send("Webhook received.");
     } catch (error) {
-        console.error("❌ Fout bij het verwerken van de webhook:", error);
+        console.error("❌ Error processing the webhook:", error);
         res.status(500).send("Internal Server Error");
     }
 });
 
-
 app.post("/radarr-webhook", async (req: Request, res: Response) => {
     const event = req.body;
 
-    console.log("📩 Radarr Webhook ontvangen:", event);
+    console.log("📩 Radarr Webhook received:", event);
 
-    // Controleer of het een evenement is voor een nieuwe film
+    // Check if it is an event for a new movie
     if (event && event.eventType === "MovieAdded" && event.movie && event.movie.folderPath) {
-        //const movieFolder = event.movie.folderPath.replace("/plex/", "/media/");; // De folderlocatie van de film
-        var movieFolder = event.movie.folderPath;
+        let movieFolder = event.movie.folderPath;
         const movieFolderDummy = path.join(config.MOVIE_FOLDER_DUMMY, path.basename(movieFolder));
         const movieFolderPlex = path.join(config.PLEX_MOVIE_FOLDER, path.basename(movieFolder));
 
-        const dummySource = config.DUMMY_FILE_LOCATION; // Pad naar het dummy-bestand
-        const dummyLink = path.join(movieFolderDummy, "dummy.mp4"); // Doel van de symlink
+        const dummySource = config.DUMMY_FILE_LOCATION; // Path to the dummy file
+        const dummyLink = path.join(movieFolderDummy, "dummy.mp4"); // Symlink target
 
-        const plexLink = path.join(movieFolderPlex, "dummy.mp4"); // Doel van de symlink
+        const plexLink = path.join(movieFolderPlex, "dummy.mp4"); // Symlink target
 
-        console.log(`🎬 Nieuwe film toegevoegd met dummy tag. Folder: ${movieFolderDummy}`);
+        console.log(`🎬 New movie added with dummy tag. Folder: ${movieFolderDummy}`);
 
         try {
-            // Zorg dat de map bestaat
+            // Ensure the directory exists
             await ensureDirectoryExists(movieFolderDummy);
             await ensureDirectoryExists(movieFolder);
 
-            // Maak dummy file
+            // Create dummy file
             await createDummyFile(dummySource, dummyLink);
 
-            // Maak de symlink
+            // Create the symlink
             await createSymlink(dummyLink, plexLink);
 
-            movieFolder = path.join(config.PLEX_MOVIE_FOLDER, path.basename(movieFolder)); // temporary because my plex has a different path
+            movieFolder = path.join(config.PLEX_MOVIE_FOLDER, path.basename(movieFolder)); // Temporary because my Plex has a different path
             await notifyPlexFolderRefresh(movieFolder);
 
             res.status(200).send("Symlink created and Plex folder notified successfully.");
-
         } catch (error) {
             res.status(500).send("Error while processing the webhook.");
         }
     } else if (event && event.eventType === "Download" && event.movie && event.movie.folderPath) {
         console.log(event);
-        var movieFolder = event.movie.folderPath;
+        let movieFolder = event.movie.folderPath;
         const imdbId = event.movie.imdbId;
         const tmdbId = event.movie.tmdbId;
 
         const movieFolderDummy = path.join(config.MOVIE_FOLDER_DUMMY, path.basename(movieFolder));
 
-        console.log(`🎬 Bestand geïmporteerd voor film: ${event.movie.title} (${event.movie.year}). Map: ${movieFolder}`);
+        console.log(`🎬 File imported for movie: ${event.movie.title} (${event.movie.year}). Folder: ${movieFolder}`);
 
-        // Roep de functie aan om dummy.mp4 op te ruimen
+        // Call the function to clean up dummy.mp4
         await cleanUpDummyFile(movieFolder);
         await removeDummyFolder(movieFolderDummy);
 
-        // Add movie to 4K Radarr instance
-
+        // Add movie to 4K Radarr instance if configured
         if (config.RADARR_4K_URL) {
-
             (async () => {
                 try {
                     const [exists, movieDetails] = await checkMovieInRadarr(tmdbId, config.RADARR_4K_URL, config.RADARR_4K_API_KEY);
 
                     if (exists) {
-
-                        if (!movieDetails.hasFile || (movieDetails.movieFile && movieDetails.movieFile.relativePath === "dummy.mp4")) { // Movie not available in 4k instance yet
-
+                        if (!movieDetails.hasFile || (movieDetails.movieFile && movieDetails.movieFile.relativePath === "dummy.mp4")) {
+                            // Movie not available in 4K instance yet
                             await searchMovieInRadarr(movieDetails.id, config.RADARR_4K_URL, config.RADARR_4K_API_KEY);
-
                         }
 
-                        console.log(`✅ Film bestaat al in Radarr: ${movieDetails.title}`);
+                        console.log(`✅ Movie already exists in Radarr: ${movieDetails.title}`);
                     } else {
-                        console.log(`❌ Film niet gevonden in Radarr. Toevoegen...`);
+                        console.log(`❌ Movie not found in Radarr. Adding...`);
 
-                        // Voeg de film toe met standaard parameters
+                        // Add the movie with default parameters
                         const newMovie = await addMovieToRadarr(tmdbId, config.RADARR_4K_MOVIE_FOLDER, Number(config.RADARR_4K_QUALITY_PROFILE_ID), true, true, config.RADARR_4K_URL, config.RADARR_4K_API_KEY, ["infiniteplexlibrary"]);
 
-                        console.log(`🎥 Film toegevoegd aan Radarr 4K: ${newMovie.title}`);
+                        console.log(`🎥 Movie added to Radarr 4K: ${newMovie.title}`);
                     }
                 } catch (error: any) {
-                    console.error(`❌ Fout bij het verwerken van de film: ${error.message}`);
+                    console.error(`❌ Error processing the movie: ${error.message}`);
                 }
             })();
-
         }
 
-        // end
-
-        movieFolder = path.join(config.PLEX_MOVIE_FOLDER, path.basename(movieFolder)); // temporary because my plex has a different path
+        // Notify Plex folder refresh
+        movieFolder = path.join(config.PLEX_MOVIE_FOLDER, path.basename(movieFolder)); // Temporary because my Plex has a different path
         await notifyPlexFolderRefresh(movieFolder);
 
         res.status(200).send("File import processed successfully.");
     } else {
-        console.log("⚠️ Geen geldig event ontvangen.");
+        console.log("⚠️ No valid event received.");
         res.status(200).send("Invalid event.");
     }
 });
 
-// Nieuwe webhook als movie is gedownload; controleren of er een dummy.mp4 in de folder zit en deze verwijderen. Dit moet die ook periodiek gaan checken.
-
-// Start de server
+// Start the server
 app.listen(PORT, () => {
-    console.log(`🚀 Webhook server luistert op poort ${PORT}`);
+    console.log(`🚀 Webhook server is listening on port ${PORT}`);
 });
