@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: arjanterheegde/infiniteplexlibrarry:latest
+    image: arjanterheegde/infiniteplexlibrary:latest
     pull_policy: always
     env_file:
       - .env
