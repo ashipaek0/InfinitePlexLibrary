@@ -7,6 +7,7 @@ import { config } from "./config";
 import { notifyPlexFolderRefresh, updatePlexDescription } from "./systems/plex";
 import { cleanUpDummyFile, createDummyFile, createSymlink, ensureDirectoryExists, removeDummyFolder } from "./utils";
 import { terminateStreamByFile } from "./systems/tautulli";
+import { getEpisodesBySeriesId, groupEpisodesBySeason, createSeasonDummyFile, monitorSeries, getSonarrTagId } from "./systems/sonarr";
 
 const app = express();
 const PORT = 3000;
@@ -164,6 +165,156 @@ app.post("/webhook", async (req: Request, res: Response, next: express.NextFunct
     }
 });
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+app.post("/sonarr-webhook", async (req: Request, res: Response) => {
+    const event = req.body;
+
+    console.log("📩 Sonarr Webhook received:", event);
+
+    if (event && event.eventType === "SeriesAdd" && event.series) {
+        const series = event.series;
+        const seriesId = series.id;
+        const seriesTitle = series.title;
+        const seriesPath = series.path;
+        const dummySeriesFolder = path.join(config.SERIES_FOLDER_DUMMY, path.basename(seriesPath));
+        const sonarrTag = config.SONARR_MONITOR_TAG_NAME;
+
+        try {
+            // Check if the series contains the required tag
+            if (!series.tags.includes(sonarrTag)) {
+                console.log(`❌ Series "${seriesTitle}" does not contain the required tag "${sonarrTag}".`);
+                res.status(200).send("Series does not contain required tag.");
+            }
+
+            console.log(`🎬 New series added with tag "${sonarrTag}": ${seriesTitle}`);
+
+            // Ensure the series folder exists in both locations
+            await ensureDirectoryExists(dummySeriesFolder);
+            await ensureDirectoryExists(seriesPath);
+
+            // Get all episodes for the series
+            const episodes = await getEpisodesBySeriesId(seriesId);
+
+            // Group episodes by season
+            const episodesBySeason = groupEpisodesBySeason(episodes);
+
+            // Loop through seasons and create dummy files for released seasons
+            for (const [seasonNumber, seasonEpisodes] of Object.entries(episodesBySeason)) {
+                if (seasonNumber === "0") {
+                    console.log(`⏭️ Skipping specials (Season 0) for "${seriesTitle}".`);
+                    continue; // Skip specials
+                }
+
+                const releasedEpisodes = seasonEpisodes.filter(
+                    (episode: any) => new Date(episode.airDate) <= new Date()
+                );
+
+                if (releasedEpisodes.length > 0) {
+                    console.log(`📁 Creating dummy file for Season ${seasonNumber} of "${seriesTitle}".`);
+
+                    // Construct paths for season folders
+                    const dummySeasonFolder = path.join(dummySeriesFolder, `Season ${seasonNumber}`);
+                    const plexSeasonFolder = path.join(seriesPath, `Season ${seasonNumber}`);
+
+                    // Ensure season folders exist
+                    await ensureDirectoryExists(dummySeasonFolder);
+                    await ensureDirectoryExists(plexSeasonFolder);
+
+                    // Create dummy file path
+                    // https://support.plex.tv/articles/naming-and-organizing-your-tv-show-files/ (Multiple Episodes in a Single File)
+                    const dummyFileName = `${seriesTitle} – s${String(seasonNumber).padStart(2, "0")}e01-e${String(
+                        releasedEpisodes.length
+                    ).padStart(2, "0")}.mp4`; // To-do: where to add dummy tag in file name? Plex wants the serie name in the file.
+
+                    const dummyFilePath = path.join(dummySeasonFolder, dummyFileName);
+                    const plexLinkPath = path.join(plexSeasonFolder, dummyFileName);
+
+                    // Create dummy file
+                    await createDummyFile(config.DUMMY_FILE_LOCATION, dummyFilePath);
+
+                    // Create symlink in Plex folder
+                    await createSymlink(dummyFilePath, plexLinkPath);
+
+                    console.log(`✅ Dummy file and symlink created for Season ${seasonNumber} of "${seriesTitle}".`);
+                } else {
+                    console.log(`⏳ Season ${seasonNumber} of "${seriesTitle}" has no released episodes yet.`);
+                }
+            }
+
+            // Refresh Plex library for the new series folder
+            const seriesFolderName = path.basename(seriesPath); // Get series folder name
+            const seriesFolder = path.join(config.PLEX_SERIES_FOLDER, seriesFolderName); // Plex series path
+            await notifyPlexFolderRefresh(seriesFolder, config.PLEX_SERIES_LIBRARY_ID);
+
+            res.status(200).send("Series processed and dummy files created.");
+        } catch (error: any) {
+            console.error(`❌ Error processing series "${seriesTitle}":`, error.message);
+            res.status(500).send("Error processing series.");
+        }
+    } else {
+        console.log("⚠️ No valid Sonarr event received.");
+        res.status(200).send("Invalid Sonarr event.");
+    }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 app.post("/radarr-webhook", async (req: Request, res: Response) => {
     const event = req.body;
 
@@ -198,7 +349,7 @@ app.post("/radarr-webhook", async (req: Request, res: Response) => {
                 await createSymlink(dummyLink, plexLink);
 
                 movieFolder = path.join(config.PLEX_MOVIE_FOLDER, path.basename(movieFolder)); // Temporary because my Plex has a different path
-                await notifyPlexFolderRefresh(movieFolder);
+                await notifyPlexFolderRefresh(movieFolder, config.PLEX_MOVIES_LIBRARY_ID);
 
                 res.status(200).send("Symlink created and Plex folder notified successfully.");
             } catch (error) {
@@ -251,12 +402,12 @@ app.post("/radarr-webhook", async (req: Request, res: Response) => {
 
         // Notify Plex folder refresh
         movieFolder = path.join(config.PLEX_MOVIE_FOLDER, path.basename(movieFolder)); // Temporary because my Plex has a different path
-        await notifyPlexFolderRefresh(movieFolder);
+        await notifyPlexFolderRefresh(movieFolder, config.PLEX_MOVIES_LIBRARY_ID);
 
         res.status(200).send("File import processed successfully.");
     } else {
         console.log("⚠️ No valid event received.");
-        res.status(200).send("Invalid event.");
+        res.status(200).send("Invalid event."); // should be 500 // rewrite the webhook part for sonarr test webhook
     }
 });
 

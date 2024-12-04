@@ -1,11 +1,11 @@
 import axios from "axios";
 import { config } from "../config";
 
-export async function notifyPlexFolderRefresh(folderPath: string): Promise<void> {
+export async function notifyPlexFolderRefresh(folderPath: string, libraryId: string): Promise<void> {
     try {
         console.log(`🔄 Starting Plex folder scan for folder: ${folderPath}`);
 
-        const url = `${config.PLEX_URL}/library/sections/${config.PLEX_LIBRARY_ID}/refresh?X-Plex-Token=${config.PLEX_TOKEN}&path=${encodeURIComponent(
+        const url = `${config.PLEX_URL}/library/sections/${libraryId}/refresh?X-Plex-Token=${config.PLEX_TOKEN}&path=${encodeURIComponent(
             folderPath
         )}`;
         const response = await axios.get(url);
