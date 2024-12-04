@@ -2,6 +2,38 @@ import axios from "axios";
 import { config } from "../config";
 
 /**
+ * Fetches all movie IDs associated with a specific tag from Radarr.
+ * @param tagId - The ID of the tag.
+ * @param radarrUrl - The Radarr API URL.
+ * @param radarrApiKey - The Radarr API key.
+ * @returns An array of movie IDs associated with the tag.
+ */
+export async function getMovieIdsByTag(
+    tagId: number,
+    radarrUrl: string,
+    radarrApiKey: string
+): Promise<number[]> {
+    try {
+        // Fetch tag details from Radarr
+        const { data: tagDetail } = await axios.get(`${radarrUrl}/tag/detail/${tagId}`, {
+            headers: { "X-Api-Key": radarrApiKey },
+        });
+
+        if (tagDetail && tagDetail.movieIds) {
+            //console.log(`✅ Found ${tagDetail.movieIds.length} movies with tag ID ${tagId}.`);
+            return tagDetail.movieIds;
+        }
+
+        console.log(`❌ No movies found for tag ID ${tagId}.`);
+        return [];
+    } catch (error: any) {
+        console.error(`❌ Error fetching movies by tag ID ${tagId}: ${error.message}`);
+        throw error;
+    }
+}
+
+
+/**
  * Checks if a movie exists in Radarr and returns the details if available.
  * @param tmdbId - TMDb ID of the movie.
  * @param radarrUrl - Radarr API URL.

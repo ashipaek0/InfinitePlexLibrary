@@ -13,6 +13,7 @@
     "@types/axios": "^0.14.4",
     "@types/express": "^5.0.0",
     "@types/node": "^22.9.3",
+    "@types/node-cron": "^3.0.11",
     "typescript": "^5.7.2"
   },
   "dependencies": {
@@ -21,6 +22,7 @@
     "chalk": "^5.3.0",
     "dayjs": "^1.11.13",
     "dotenv": "^16.4.5",
-    "express": "^4.21.1"
+    "express": "^4.21.1",
+    "node-cron": "^3.0.3"
   }
 }

@@ -88,7 +88,7 @@ app.post("/webhook", async (req: Request, res: Response, next: express.NextFunct
             console.log("📋 Event details:", JSON.stringify(event, null, 2));
 
             if (event.media_type === "movie") {
-                const imdbId = event.imdb_id;
+                const tmdbId = event.tmdb_id;
                 const ratingKey = event.rating_key;
 
                 if (!ratingKey) {
@@ -106,19 +106,19 @@ app.post("/webhook", async (req: Request, res: Response, next: express.NextFunct
                 activeRequests.add(ratingKey);
 
                 try {
-                    if (imdbId) {
-                        console.log(`🎬 IMDb ID received: ${imdbId}`);
+                    if (tmdbId) {
+                        console.log(`🎬 TMDb ID received: ${tmdbId}`);
 
                         // Retrieve movie details from Radarr
-                        const response = await axios.get(`${config.RADARR_URL}/movie`, {
+                        const response = await axios.get(`${config.RADARR_URL}/movie?tmdbId=${tmdbId}`, {
                             headers: { "X-Api-Key": config.RADARR_API_KEY },
                         });
 
-                        const movie = response.data.find((m: any) => m.imdbId === imdbId);
+                        const movie = response.data;
 
                         if (movie) {
                             console.log("✅ Movie found in Radarr:");
-                            console.log(JSON.stringify(movie, null, 2));
+                            //console.log(JSON.stringify(movie, null, 2));
 
                             const originalFilePath = event.file;
 
@@ -180,25 +180,33 @@ app.post("/radarr-webhook", async (req: Request, res: Response) => {
 
         const plexLink = path.join(movieFolderPlex, "dummy.mp4"); // Symlink target
 
-        console.log(`🎬 New movie added with dummy tag. Folder: ${movieFolderDummy}`);
+        const radarrTag = process.env.RADARR_TAG_NAME;
 
-        try {
-            // Ensure the directory exists
-            await ensureDirectoryExists(movieFolderDummy);
-            await ensureDirectoryExists(movieFolder);
+        if (event.movie.tags.includes(radarrTag)) {
 
-            // Create dummy file
-            await createDummyFile(dummySource, dummyLink);
+            console.log(`🎬 New movie added with ${radarrTag} tag. Folder: ${movieFolderDummy}`);
 
-            // Create the symlink
-            await createSymlink(dummyLink, plexLink);
+            try {
+                // Ensure the directory exists
+                await ensureDirectoryExists(movieFolderDummy);
+                await ensureDirectoryExists(movieFolder);
 
-            movieFolder = path.join(config.PLEX_MOVIE_FOLDER, path.basename(movieFolder)); // Temporary because my Plex has a different path
-            await notifyPlexFolderRefresh(movieFolder);
+                // Create dummy file
+                await createDummyFile(dummySource, dummyLink);
 
-            res.status(200).send("Symlink created and Plex folder notified successfully.");
-        } catch (error) {
-            res.status(500).send("Error while processing the webhook.");
+                // Create the symlink
+                await createSymlink(dummyLink, plexLink);
+
+                movieFolder = path.join(config.PLEX_MOVIE_FOLDER, path.basename(movieFolder)); // Temporary because my Plex has a different path
+                await notifyPlexFolderRefresh(movieFolder);
+
+                res.status(200).send("Symlink created and Plex folder notified successfully.");
+            } catch (error) {
+                res.status(500).send("Error while processing the webhook.");
+            }
+        } else {
+            const receivedTags = event.movie.tags.join(", "); 
+            console.log(`❌ Movie "${event.movie.title}" does not contain the required tag "${radarrTag}". Received tags: [${receivedTags}]`);
         }
     } else if (event && event.eventType === "Download" && event.movie && event.movie.folderPath) {
         console.log(event);

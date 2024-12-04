@@ -4,6 +4,7 @@ export const config = {
     RADARR_URL: process.env.RADARR_URL as string,
     RADARR_API_KEY: process.env.RADARR_API_KEY as string,
     RADARR_MOVIE_FOLDER: process.env.RADARR_MOVIE_FOLDER as string,
+    RADARR_MONITOR_TAG_NAME: process.env.RADARR_MONITOR_TAG_NAME as string,
 
     TAUTULLI_URL: process.env.TAUTULLI_URL as string,
     TAUTULLI_API_KEY: process.env.TAUTULLI_API_KEY as string,
