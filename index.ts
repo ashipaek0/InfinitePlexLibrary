@@ -7,7 +7,7 @@ import { config } from "./config";
 import { notifyPlexFolderRefresh, updatePlexDescription } from "./systems/plex";
 import { cleanUpDummyFile, createDummyFile, createSymlink, ensureDirectoryExists, removeDummyFolder } from "./utils";
 import { terminateStreamByFile } from "./systems/tautulli";
-import { getEpisodesBySeriesId, groupEpisodesBySeason, searchSeriesInSonarr, getSeriesByTvdbId, monitorAllSeasons } from "./systems/sonarr";
+import { getEpisodesBySeriesId, groupEpisodesBySeason, searchSeriesInSonarr, getSeriesByTvdbId, monitorAllSeasons, monitorSeries } from "./systems/sonarr";
 
 const app = express();
 const PORT = 3000;
@@ -269,6 +269,8 @@ app.post("/webhook", async (req: Request, res: Response, next: express.NextFunct
                     console.log(`✅ Found series in Sonarr: ${series.title}`);
 
                     // To-do: Watch al seasons; enable monitoring; then the season search can start.
+
+                    await monitorAllSeasons(series.id, config.SONARR_URL, config.SONARR_API_KEY);
 
                     console.log(`🔍 Searching for season ${seasonNumber} in Sonarr...`);
                     await searchSeriesInSonarr(series.id, seasonNumber, config.SONARR_URL, config.SONARR_API_KEY);
