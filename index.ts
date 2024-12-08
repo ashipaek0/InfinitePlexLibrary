@@ -50,13 +50,10 @@ async function monitorSeasonAvailability(
                 if (unavailableEpisodes.length === 0) {
                     console.log(`🎉 All episodes for Season ${seasonNumber} of Series ID ${seriesId} are now available!`);
 
-                    // Update the season description with availability status
-                    await updatePlexDescription(ratingKey, seasonDescription, "All episodes for this season are now available!");
-
-                    clearInterval(interval);
+                   clearInterval(interval);
                     resolve();
                 } else {
-                    requestStatus = `Still waiting for ${unavailableEpisodes.length} episodes to be available in Season ${seasonNumber}...`;
+                    requestStatus = `Waiting for ${unavailableEpisodes.length} episodes to be available in Season ${seasonNumber}...`;
 
                     // Update the season description with the current status
                     await updatePlexDescription(ratingKey, seasonDescription, requestStatus);
@@ -72,7 +69,7 @@ async function monitorSeasonAvailability(
                 await updatePlexDescription(
                     ratingKey,
                     seasonDescription,
-                    `Time limit exceeded. Not all episodes in Season ${seasonNumber} are available yet.`
+                    `Time limit exceeded. Not all episodes in Season ${seasonNumber} are available yet. Please try again.`
                 );
 
                 clearInterval(interval);
@@ -268,16 +265,20 @@ app.post("/webhook", async (req: Request, res: Response, next: express.NextFunct
 
                     console.log(`✅ Found series in Sonarr: ${series.title}`);
 
-                    // To-do: Watch al seasons; enable monitoring; then the season search can start.
-
+                    // To-do; don't monitor the specials! (season 0)
+                    // Current code doesn't work and still monitors the specials. 
                     await monitorAllSeasons(series.id, config.SONARR_URL, config.SONARR_API_KEY);
 
                     console.log(`🔍 Searching for season ${seasonNumber} in Sonarr...`);
                     await searchSeriesInSonarr(series.id, seasonNumber, config.SONARR_URL, config.SONARR_API_KEY);
 
+                    // To-do; make monitoring all seasons optional!
                     console.log("🔄 Monitoring the entire series in Sonarr...");
+                    // Eerst de aflevering die gevraagd wordt; deze wil de gebruiker afspelen en ook de status voor terugkrijgen. Scheelt weer wat seconden voor de gebruiker.
                     await monitorSeasonAvailability(series.id, seasonNumber, ratingKey, "Checking availability for Season...");
 
+
+                    // To-do; make this optional!
                     console.log("🔍 Searching for the rest of the seasons in Sonarr...");
                     await searchSeriesInSonarr(series.id, null, config.SONARR_URL, config.SONARR_API_KEY);
 
@@ -413,6 +414,38 @@ app.post("/sonarr-webhook", async (req: Request, res: Response) => {
             console.error(`❌ Error processing series "${seriesTitle}":`, error.message);
             res.status(500).send("Error processing series.");
         }
+    } else if (event.eventType === "Download" && event.series && event.episodes && event.episodeFile) {
+        const series = event.series;
+        const episode = event.episodes[0];
+        const episodeFile = event.episodeFile;
+
+        const seasonNumber = episode.seasonNumber;
+        const seriesFolder = series.path;
+        const dummySeasonFolder = path.join(
+            config.SERIES_FOLDER_DUMMY,
+            path.basename(seriesFolder),
+            `Season ${seasonNumber}`
+        );
+
+        console.log(
+            `🎬 File imported for series: ${series.title} (ID: ${series.id}, Season: ${seasonNumber}, Episode: ${episode.episodeNumber}).`
+        );
+
+        console.log(`📁 Dummy folder for cleanup: ${dummySeasonFolder}`);
+
+        // Cleanup the dummy file for the season
+        await cleanUpDummyFile(dummySeasonFolder);
+
+        // Remove the dummy folder for the season if it exists
+        await removeDummyFolder(dummySeasonFolder);
+
+        // Notify Plex to refresh the series folder
+        await notifyPlexFolderRefresh(seriesFolder, config.PLEX_SERIES_LIBRARY_ID);
+
+        console.log(`✅ Successfully processed import for series: ${series.title}, Season: ${seasonNumber}, Episode: ${episode.episodeNumber}.`);
+
+        res.status(200).send("Sonarr Download event processed successfully.");
+  
     } else {
         console.log("⚠️ No valid Sonarr event received.");
         res.status(200).send("Invalid Sonarr event.");
@@ -512,12 +545,12 @@ app.post("/radarr-webhook", async (req: Request, res: Response) => {
         if (config.RADARR_4K_URL) {
             (async () => {
                 try {
-                    const [exists, movieDetails] = await checkMovieInRadarr(tmdbId, config.RADARR_4K_URL, config.RADARR_4K_API_KEY);
+                    const [exists, movieDetails] = await checkMovieInRadarr(tmdbId, config.RADARR_4K_URL!, config.RADARR_4K_API_KEY!);
 
                     if (exists) {
                         if (!movieDetails.hasFile || (movieDetails.movieFile && movieDetails.movieFile.relativePath === "dummy.mp4")) {
                             // Movie not available in 4K instance yet
-                            await searchMovieInRadarr(movieDetails.id, config.RADARR_4K_URL, config.RADARR_4K_API_KEY);
+                            await searchMovieInRadarr(movieDetails.id, config.RADARR_4K_URL!, config.RADARR_4K_API_KEY!);
                         }
 
                         console.log(`✅ Movie already exists in Radarr: ${movieDetails.title}`);
@@ -525,8 +558,8 @@ app.post("/radarr-webhook", async (req: Request, res: Response) => {
                         console.log(`❌ Movie not found in Radarr. Adding...`);
 
                         // Add the movie with default parameters
-                        const newMovie = await addMovieToRadarr(tmdbId, config.RADARR_4K_MOVIE_FOLDER, 
-                            Number(config.RADARR_4K_QUALITY_PROFILE_ID), true, true, config.RADARR_4K_URL, config.RADARR_4K_API_KEY, ["infiniteplexlibrary"]);
+                        const newMovie = await addMovieToRadarr(tmdbId, config.RADARR_4K_MOVIE_FOLDER!, 
+                            Number(config.RADARR_4K_QUALITY_PROFILE_ID), true, true, config.RADARR_4K_URL!, config.RADARR_4K_API_KEY!, ["infiniteplexlibrary"]);
 
                         console.log(`🎥 Movie added to Radarr 4K: ${newMovie.title}`);
                     }

@@ -175,7 +175,7 @@ export async function monitorSeries(seriesId: number): Promise<void> {
 }
 
 /**
- * Monitors all seasons and episodes of a series in Sonarr.
+ * Monitors all seasons and episodes of a series in Sonarr, excluding specials (Season 0).
  * @param seriesId - The Sonarr series ID.
  * @param sonarrUrl - The Sonarr API URL.
  * @param sonarrApiKey - The Sonarr API key.
@@ -186,20 +186,20 @@ export async function monitorAllSeasons(
     sonarrApiKey: string
 ): Promise<void> {
     try {
-        console.log(`🔄 Fetching series details for ID: ${seriesId} to monitor all seasons...`);
+        console.log(`🔄 Fetching series details for ID: ${seriesId} to monitor all seasons (excluding specials)...`);
 
         // Fetch series details from Sonarr
         const { data: series } = await axios.get(`${sonarrUrl}/series/${seriesId}`, {
             headers: { "X-Api-Key": sonarrApiKey },
         });
 
-        // Update the series to monitor all seasons and episodes
+        // Update the series to monitor all seasons and episodes, excluding Season 0 (specials)
         const updatedSeries = {
             ...series,
             monitored: true, // Set the entire series as monitored
             seasons: series.seasons.map((season: any) => ({
                 ...season,
-                monitored: true, // Set each season as monitored
+                monitored: season.seasonNumber !== 0, // Monitor all seasons except Season 0
             })),
         };
 
@@ -207,14 +207,13 @@ export async function monitorAllSeasons(
             headers: { "X-Api-Key": sonarrApiKey },
         });
 
-        console.log(`✅ All seasons and episodes of series "${series.title}" are now monitored.`);
+        console.log(`✅ All seasons (excluding specials) of series "${series.title}" are now monitored.`);
     } catch (error: any) {
         console.error(`❌ Error monitoring all seasons of series ID ${seriesId}: ${error.message}`);
     }
 }
-
 /**
- * Searches for a specific season or all seasons of a series in Sonarr.
+ * Searches for a specific season or all seasons of a series in Sonarr, excluding Season 0.
  * @param seriesId - The unique ID of the series in Sonarr.
  * @param seasonNumber - The specific season number to search (optional, null for all seasons).
  * @param sonarrUrl - Sonarr API URL.
@@ -227,26 +226,57 @@ export async function searchSeriesInSonarr(
     sonarrApiKey: string
 ): Promise<void> {
     try {
-        // Prepare the payload with correct types
-        const payload: Record<string, any> = {
-            name: "SeasonSearch",
-            seriesId,
-        };
-
-        // Only include seasonNumber if it's not null, ensuring it's a number
         if (seasonNumber !== null) {
-            payload.seasonNumber =  Number(seasonNumber);
+            // Search for a specific season
+            const payload = {
+                name: "SeasonSearch",
+                seriesId,
+                seasonNumber: Number(seasonNumber), // Ensure seasonNumber is a number
+            };
+
+            console.log("🔍 Sending SeasonSearch payload to Sonarr:", JSON.stringify(payload, null, 2));
+
+            const response = await axios.post(`${sonarrUrl}/command`, payload, {
+                headers: { "X-Api-Key": sonarrApiKey },
+            });
+
+            console.log(`✅ Search started successfully for series ID ${seriesId}, season ${seasonNumber}.`);
+            console.log("Response:", response.data);
+        } else {
+            // Fetch series details to get all seasons
+            console.log(`🔄 Fetching series details for ID: ${seriesId} to search all seasons...`);
+
+            const { data: series } = await axios.get(`${sonarrUrl}/series/${seriesId}`, {
+                headers: { "X-Api-Key": sonarrApiKey },
+            });
+
+            // Filter out Season 0
+            const validSeasons = series.seasons.filter(
+                (season: any) => season.seasonNumber !== 0
+            );
+
+            console.log(`📋 Found ${validSeasons.length} valid seasons to search (excluding Season 0).`);
+
+            // Search for each season individually
+            for (const season of validSeasons) {
+                const payload = {
+                    name: "SeasonSearch",
+                    seriesId,
+                    seasonNumber: season.seasonNumber,
+                };
+
+                console.log("🔍 Sending SeasonSearch payload to Sonarr:", JSON.stringify(payload, null, 2));
+
+                const response = await axios.post(`${sonarrUrl}/command`, payload, {
+                    headers: { "X-Api-Key": sonarrApiKey },
+                });
+
+                console.log(
+                    `✅ Search started successfully for series ID ${seriesId}, season ${season.seasonNumber}.`
+                );
+                console.log("Response:", response.data);
+            }
         }
-
-        console.log("🔍 Sending SeasonSearch payload to Sonarr:", JSON.stringify(payload, null, 2));
-
-        // Send the API request
-        const response = await axios.post(`${sonarrUrl}/command`, payload, {
-            headers: { "X-Api-Key": sonarrApiKey },
-        });
-
-        console.log(`✅ Search started successfully for series ID ${seriesId}, season ${seasonNumber || "all"}.`);
-        console.log("Response:", response.data);
     } catch (error: any) {
         console.error(`❌ Error searching for series in Sonarr: ${error.message}`);
         throw error;
