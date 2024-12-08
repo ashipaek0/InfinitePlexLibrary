@@ -105,7 +105,7 @@ Create this Connect webhook in Radarr to communicate with the script if a new mo
 
 ### Sonarrr
 Create this Connect webhook in Sonarr to communicate with the script if a new series with the tag 'dummy' is added:
-<img width="752" alt="image" src="https://github.com/user-attachments/assets/509e6c82-bb0a-465e-8aba-fa23a99cbfb1">
+<img width="733" alt="image" src="https://github.com/user-attachments/assets/05b7cef9-8f94-4e3d-b884-d8e65077dc72">
 
 ### Kometa
 
