@@ -20,16 +20,3 @@ services:
     env_file:
       - .env 
     restart: unless-stopped
-
-  dailymaintenance:
-    image: node:18-alpine
-    working_dir: /app
-    volumes:
-      - /mnt/user/realdebrid/data:/mount #Should be the same as Plex
-      - /mnt/user/data/plex:/media # Radarr movie path
-      - /mnt/user/data/plex:/plex # Plex movie path (could be the same as above)
-      - /mnt/user/appdata/infiniteplexlibrary:/infiniteplexlibrary # Dummy folder
-    entrypoint: ["sh", "-c", "node scripts/dailyMovieMaintenance.js"]
-    environment:
-      - .env 
-    restart: "no"    
