@@ -42,6 +42,8 @@ For manual maintenance, run `npx ts-node /scripts/maintenance.ts` inside the Doc
 ### Tautulli
 Create a new Notification Agent in the Tautulli settings.
 
+Movies:
+
 **Webhook URL**: http://ip:port/webhook
 
 **Webhook method**: POST
@@ -64,6 +66,34 @@ Create a new Notification Agent in the Tautulli settings.
     "player": "{player}"
 }
 ```
+
+Series:
+
+**Webhook URL**: http://ip:port/webhook
+
+**Webhook method**: POST
+
+**Trigger**: Playback Start
+
+**Condition**: Filename ends with (dummy).mp4
+
+**JSON Data for playback start**:
+```
+{
+    "event": "playback.start",
+    "file": "{file}",
+    "imdb_id": "{imdb_id}",
+    "tmdb_id": "{themoviedb_id}",
+    "user": "{user}",
+    "title": "{title}",
+    "rating_key": "{rating_key}",
+    "media_type": "{media_type}",
+    "player": "{player}",
+    "season_num": "{season_num}",
+    "thetvdb_id": "{thetvdb_id}"
+}
+```
+
 ### Radarr
 Radarr list example:
 ![image](https://github.com/user-attachments/assets/f1e939cf-31b3-4752-9a30-f6a9ae7f7800)
@@ -72,6 +102,10 @@ Create this Connect webhook in Radarr to communicate with the script if a new mo
 ![image](https://github.com/user-attachments/assets/ad4c87f1-accd-4026-81d2-cf329f026508)
 
 > **Note**: Don't map MOVIE_FOLDER_DUMMY to Radarr in Docker. This is necassery so Radarr doesn't mark the movie as downloaded!!
+
+### Sonarrr
+Create this Connect webhook in Sonarr to communicate with the script if a new series with the tag 'dummy' is added:
+<img width="752" alt="image" src="https://github.com/user-attachments/assets/509e6c82-bb0a-465e-8aba-fa23a99cbfb1">
 
 ### Kometa
 
