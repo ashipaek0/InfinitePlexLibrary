@@ -34,6 +34,11 @@ With this script, you can manage a large Plex library without overloading your D
 ## Installation & Usage
 Ensure that your Tautulli is set up to send playback start events to the webhook URL configured for this script.
 
+### Infinite Plex Library
+Place the dummy.mp4 file in /infiniteplexlibrary/dummy.mp4
+
+For manual maintenance, run `npx ts-node /scripts/maintenance.ts` inside the Docker console. This will verify if every Radarr movie with the "dummy" tag still has a `dummy.mp4` file. It will also check if downloaded movies contain a `dummy.mp4` file, and the script will delete it if found. After running this, you will need to manually refresh the Plex library.
+
 ### Tautulli
 Create a new Notification Agent in the Tautulli settings.
 
@@ -51,9 +56,9 @@ Create a new Notification Agent in the Tautulli settings.
     "event": "playback.start",
     "file": "{file}",
     "imdb_id": "{imdb_id}",
+    "tmdb_id": "{themoviedb_id}",
     "user": "{user}",
     "title": "{title}",
-    "plex_id": "{rating_key}",
     "rating_key": "{rating_key}",
     "media_type": "{media_type}",
     "player": "{player}"
@@ -65,6 +70,8 @@ Radarr list example:
 
 Create this Connect webhook in Radarr to communicate with the script if a new movie with the tag 'dummy' is added:
 ![image](https://github.com/user-attachments/assets/ad4c87f1-accd-4026-81d2-cf329f026508)
+
+> **Note**: Don't map MOVIE_FOLDER_DUMMY to Radarr in Docker. This is necassery so Radarr doesn't mark the movie as downloaded!!
 
 ### Kometa
 

@@ -2,13 +2,21 @@ version: '3.8'
 
 services:
   infiniteplexlibrary:
-    build:
-      context: .
-      dockerfile: Dockerfile
     image: arjanterheegde/infiniteplexlibrary:latest
-    pull_policy: always
-    env_file:
-      - .env
+    container_name: infiniteplexlibrary
+    user: "99:100"
     ports:
       - "3000:3000"
+    volumes:
+      - /mnt/user/realdebrid/data:/mount #Should be the same as Plex
+      - /mnt/user/data/plex:/media # Radarr movie path
+      - /mnt/user/data/plex:/plex # Plex movie path (could be the same as above)
+      - /mnt/user/appdata/infiniteplexlibrary:/infiniteplexlibrary # Dummy folder
+    environment:
+      PUID: 99
+      PGID: 100
+      UMASK: 002
+      TZ: Europe/Amsterdam  
+    env_file:
+      - .env 
     restart: unless-stopped
