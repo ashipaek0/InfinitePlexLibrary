@@ -149,7 +149,7 @@ app.post("/webhook", async (req: Request, res: Response, next: express.NextFunct
         console.log("📩 Event received:", event);
 
         // Check if it is a playback.start event
-        if (event && event.event === "playback.start") {
+        if (event && event.event === "PlaybackStart") {
             console.log("▶️ Playback started!");
             console.log("📋 Event details:", JSON.stringify(event, null, 2));
 
